@@ -7,7 +7,9 @@ import {
 
 // ApiHandlerOptions
 
-export type ApiHandlerOptions = Omit<ProviderSettings, "apiProvider">
+export type ApiHandlerOptions = Omit<ProviderSettings, "apiProvider"> & {
+  deepSeekCaBundlePath?: string
+}
 
 // RouterName
 
