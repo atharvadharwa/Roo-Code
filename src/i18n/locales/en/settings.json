@@ -1,0 +1,12 @@
+{
+  "providers": {
+    "endpoint": "Endpoint",
+    "endpointDescription": "The API endpoint URL for DeepSeek",
+    "caBundlePath": "CA Bundle Path",
+    "caBundlePathDescription": "Path to a CA bundle file for SSL certificate verification (optional)"
+  },
+  "placeholders": {
+    "endpoint": "https://api.deepseek.com",
+    "caBundlePath": "e.g., /path/to/ca-bundle.crt"
+  }
+}

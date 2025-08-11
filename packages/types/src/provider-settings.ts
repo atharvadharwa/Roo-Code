@@ -196,6 +196,7 @@ const mistralSchema = apiModelIdProviderModelSchema.extend({
 const deepSeekSchema = apiModelIdProviderModelSchema.extend({
 	deepSeekBaseUrl: z.string().optional(),
 	deepSeekApiKey: z.string().optional(),
+	deepSeekCaBundlePath: z.string().optional(),
 })
 
 const doubaoSchema = apiModelIdProviderModelSchema.extend({

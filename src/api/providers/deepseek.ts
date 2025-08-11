@@ -1,4 +1,5 @@
 import https from 'https';
+import http from 'http';
 import fs from 'fs';
 import type { ApiHandlerOptions } from "../../shared/api";
 import { getModelParams } from "../transform/model-params";
@@ -7,7 +8,6 @@ import { deepSeekModels, deepSeekDefaultModelId } from "@roo-code/types";
 // Define the required types locally
 type ApiRequest = any;
 type ApiStreamChunk = any;
-type ApiStreamResponse = any;
 type ModelInfoWithParams = any;
 
 export class DeepSeekHandler {
@@ -36,7 +36,7 @@ export class DeepSeekHandler {
     return { id, info, ...params };
   }
 
-  async createMessage(request: ApiRequest, onProgress: (chunk: ApiStreamChunk) => void): Promise<ApiStreamResponse> {
+  async *createMessage(request: ApiRequest): AsyncGenerator<ApiStreamChunk> {
     const endpoint = this.options.deepSeekBaseUrl ?? "https://api.deepseek.com";
     const token = this.options.deepSeekApiKey;
     const model = this.getModel().id;
@@ -50,7 +50,7 @@ export class DeepSeekHandler {
       "Authorization": `Bearer ${token}`
     };
 
-    const messages = request.messages.map((m: any) => ({
+    const messages = (request.messages || []).map((m: any) => ({
       role: m.role,
       content: m.content
     }));
@@ -60,71 +60,112 @@ export class DeepSeekHandler {
       messages
     };
 
-    return new Promise((resolve, reject) => {
-      const req = https.request(endpoint, {
+    // Parse endpoint URL to determine protocol
+    const url = new URL(endpoint);
+    const httpModule = url.protocol === 'https:' ? https : http;
+    
+    const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
+      const options: https.RequestOptions = {
         method: 'POST',
-        headers,
-        agent: this.agent
-      }, (res: any) => {
-        let buffer = '';
-        
-        res.on('data', (chunk: any) => {
-          buffer += chunk.toString();
-          
-          // Process each complete JSON object in the buffer
-          let boundary: number;
-          while ((boundary = buffer.indexOf('\n')) !== -1) {
-            const line = buffer.substring(0, boundary);
-            buffer = buffer.substring(boundary + 1);
-            
-            if (line.startsWith('data: ')) {
-              const jsonStr = line.substring(6);
-              
-              if (jsonStr === '[DONE]') {
-                resolve({});
-                return;
-              }
-              
-              try {
-                const json = JSON.parse(jsonStr);
-                if (json.choices && json.choices.length > 0 && json.choices[0].delta?.content) {
-                  onProgress({
-                    type: 'content',
-                    content: json.choices[0].delta.content
-                  });
-                }
-              } catch (e) {
-                console.error('Error parsing JSON:', jsonStr, e);
-              }
-            }
-          }
-        });
+        headers
+      };
+      
+      // Only add agent for HTTPS connections
+      if (url.protocol === 'https:' && this.agent) {
+        options.agent = this.agent;
+      }
 
-        res.on('end', () => {
-          if (buffer.length > 0) {
-            try {
-              const json = JSON.parse(buffer);
-              if (json.choices && json.choices.length > 0 && json.choices[0].delta?.content) {
-                onProgress({
-                  type: 'content',
-                  content: json.choices[0].delta.content
-                });
-              }
-            } catch (e) {
-              console.error('Error parsing final JSON:', buffer, e);
-            }
-          }
-          resolve({});
-        });
-      });
-
-      req.on('error', (error: any) => {
-        reject(error);
-      });
-
+      const req = httpModule.request(url, options, resolve);
+      req.on('error', reject);
       req.write(JSON.stringify(data));
       req.end();
     });
+
+    // Capture full response for debugging
+    let buffer = '';
+    for await (const chunk of response) {
+      buffer += chunk.toString();
+    }
+
+    // Log full API response details for debugging
+    console.error("DeepSeek API Response Details:");
+    console.error("Status Code:", response.statusCode);
+    console.error("Headers:", JSON.stringify(response.headers, null, 2));
+    console.error("Full Body:", buffer);
+    
+    // First try parsing as JSON (non-streaming response)
+    try {
+      const json = JSON.parse(buffer);
+      console.error("Parsed non-streaming response:", json);
+      
+      if (json.choices && json.choices.length > 0) {
+        // Use safe navigation to avoid errors
+        const message = json.choices[0].message || {};
+        const content = message.content;
+        
+        if (content) {
+          yield {
+            type: 'content',
+            content: content
+          };
+          return;
+        } else {
+          console.error("No content found in non-streaming response choices");
+        }
+      } else {
+        console.error("No choices found in non-streaming response");
+      }
+    } catch (e) {
+      console.error("Non-streaming parse error:", e);
+    }
+    
+    // Process as streaming response
+    let lines = buffer.split('\n');
+    let contentFound = false;
+    
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const jsonStr = line.substring(6);
+        
+        if (jsonStr === '[DONE]') {
+          console.error("Received [DONE] marker");
+          if (!contentFound) {
+            console.error("No content found before [DONE] marker");
+          }
+          return;
+        }
+        
+        try {
+          const json = JSON.parse(jsonStr);
+          console.error("Parsed streaming chunk:", json);
+          
+          if (json.choices && json.choices.length > 0) {
+            // Try all possible content locations
+            const content =
+              json.choices[0].delta?.content ||
+              json.choices[0].message?.content ||
+              json.choices[0].text;
+            
+            if (content) {
+              contentFound = true;
+              yield {
+                type: 'content',
+                content: content
+              };
+            } else {
+              console.error("No content in choice:", json.choices[0]);
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing JSON chunk:', jsonStr, e);
+        }
+      }
+    }
+
+    if (!contentFound) {
+      console.error("No content found in streaming response");
+      throw new Error("No assistant messages found in API response");
+    }
   }
 
   protected processUsageMetrics(usage: any) {

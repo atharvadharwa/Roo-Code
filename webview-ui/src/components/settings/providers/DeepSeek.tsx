@@ -30,16 +30,50 @@ export const DeepSeek = ({ apiConfiguration, setApiConfigurationField }: DeepSee
 	return (
 		<>
 			<VSCodeTextField
+				value={apiConfiguration?.apiModelId || ""}
+				onInput={handleInputChange("apiModelId")}
+				placeholder="Model name"
+				className="w-full">
+				<label className="block font-medium mb-1">Model</label>
+			</VSCodeTextField>
+			<div className="text-sm text-vscode-descriptionForeground -mt-2">
+				Enter the model name (e.g., DeepSeek-R1-Distill-Qwen-32B)
+			</div>
+
+			<VSCodeTextField
 				value={apiConfiguration?.deepSeekApiKey || ""}
 				type="password"
 				onInput={handleInputChange("deepSeekApiKey")}
 				placeholder={t("settings:placeholders.apiKey")}
-				className="w-full">
+				className="w-full mt-4">
 				<label className="block font-medium mb-1">{t("settings:providers.deepSeekApiKey")}</label>
 			</VSCodeTextField>
 			<div className="text-sm text-vscode-descriptionForeground -mt-2">
 				{t("settings:providers.apiKeyStorageNotice")}
 			</div>
+
+			<VSCodeTextField
+				value={apiConfiguration?.deepSeekBaseUrl || ""}
+				onInput={handleInputChange("deepSeekBaseUrl")}
+				placeholder={t("settings:placeholders.endpoint")}
+				className="w-full mt-4">
+				<label className="block font-medium mb-1">{t("settings:providers.endpoint")}</label>
+			</VSCodeTextField>
+			<div className="text-sm text-vscode-descriptionForeground -mt-2">
+				{t("settings:providers.endpointDescription")}
+			</div>
+			
+			<VSCodeTextField
+				value={apiConfiguration?.deepSeekCaBundlePath || ""}
+				onInput={handleInputChange("deepSeekCaBundlePath")}
+				placeholder={t("settings:placeholders.caBundlePath")}
+				className="w-full mt-4">
+				<label className="block font-medium mb-1">{t("settings:providers.caBundlePath")}</label>
+			</VSCodeTextField>
+			<div className="text-sm text-vscode-descriptionForeground -mt-2">
+				{t("settings:providers.caBundlePathDescription")}
+			</div>
+
 			{!apiConfiguration?.deepSeekApiKey && (
 				<VSCodeButtonLink href="https://platform.deepseek.com/" appearance="secondary">
 					{t("settings:providers.getDeepSeekApiKey")}
