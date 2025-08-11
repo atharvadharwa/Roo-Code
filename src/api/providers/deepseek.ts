@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import https from 'https';
 import http from 'http';
 import fs from 'fs';
@@ -14,17 +15,19 @@ export class DeepSeekHandler {
   private options: ApiHandlerOptions;
   private caBundlePath?: string;
   private agent?: https.Agent;
+  private outputChannel: vscode.OutputChannel;
 
   constructor(options: ApiHandlerOptions) {
     this.options = options;
     this.caBundlePath = options.deepSeekCaBundlePath;
+    this.outputChannel = vscode.window.createOutputChannel('DeepSeek Debug');
 
     if (this.caBundlePath) {
       try {
         const ca = fs.readFileSync(this.caBundlePath);
         this.agent = new https.Agent({ ca });
       } catch (error) {
-        console.error(`Error reading CA bundle: ${error}`);
+        this.outputChannel.appendLine(`Error reading CA bundle: ${error}`);
       }
     }
   }
@@ -110,13 +113,13 @@ export class DeepSeekHandler {
           };
           return;
         } else {
-          console.error("No content found in non-streaming response choices");
+          this.outputChannel.appendLine("No content found in non-streaming response choices");
         }
       } else {
-        console.error("No choices found in non-streaming response");
+        this.outputChannel.appendLine("No choices found in non-streaming response");
       }
     } catch (e) {
-      console.error("Non-streaming parse error:", e);
+      this.outputChannel.appendLine(`Non-streaming parse error: ${e}`);
     }
     
     // Process as streaming response
@@ -137,7 +140,8 @@ export class DeepSeekHandler {
         
         try {
           const json = JSON.parse(jsonStr);
-          console.error("Parsed streaming chunk:", json);
+          this.outputChannel.appendLine("Parsed streaming chunk:");
+          this.outputChannel.appendLine(JSON.stringify(json, null, 2));
           
           if (json.choices && json.choices.length > 0) {
             // Try all possible content locations
@@ -153,17 +157,17 @@ export class DeepSeekHandler {
                 content: content
               };
             } else {
-              console.error("No content in choice:", json.choices[0]);
+              this.outputChannel.appendLine("No content in choice: " + JSON.stringify(json.choices[0]));
             }
           }
         } catch (e) {
-          console.error('Error parsing JSON chunk:', jsonStr, e);
+          this.outputChannel.appendLine(`Error parsing JSON chunk: ${jsonStr} - ${e}`);
         }
       }
     }
 
     if (!contentFound) {
-      console.error("No content found in streaming response");
+      this.outputChannel.appendLine("No content found in API response");
       throw new Error("No assistant messages found in API response");
     }
   }
