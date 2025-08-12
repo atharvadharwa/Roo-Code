@@ -56,25 +56,14 @@ export class DeepSeekHandler {
       "Authorization": `Bearer ${token}`
     }
 
-    // Format messages according to Python sample
-    const messages = (request.messages || []).map((m: any) => ({
-      role: m.role,
-      content: m.content
-    }))
+    // Format messages using helper function
+    const messages = this.formatMessages(request);
 
-    // Add system prompt if needed
-    if (request.systemPrompt) {
-      messages.unshift({
-        role: "system",
-        content: request.systemPrompt
-      })
-    }
-
-    // Create payload matching Python sample
+    // Create payload
     const data = {
       model,
       messages
-    }
+    };
 
     // Parse endpoint URL to determine protocol
     const url = new URL(endpoint)
@@ -146,6 +135,39 @@ export class DeepSeekHandler {
       this.outputChannel.appendLine(`Response parse error: ${e}`)
       throw new Error(`Failed to parse API response: ${e.message}`)
     }
+  }
+
+  private formatMessages(request: ApiRequest): any[] {
+    const messages = [];
+    
+    // Handle system message (compatibility with both systemMessage and systemPrompt)
+    const systemMessage = request.systemMessage || request.systemPrompt;
+    if (systemMessage) {
+      messages.push({
+        role: "system",
+        content: systemMessage
+      });
+    }
+
+    // Add user messages, ensuring at least one user message exists
+    if (request.messages && request.messages.length > 0) {
+      for (const message of request.messages) {
+        messages.push({
+          role: message.role || "user",
+          content: message.content
+        });
+      }
+    } else if (request.prompt) {
+      // Fallback to prompt field if no messages array
+      messages.push({
+        role: "user",
+        content: request.prompt
+      });
+    } else {
+      throw new Error("No user messages or prompt provided");
+    }
+    
+    return messages;
   }
 
   protected processUsageMetrics(usage: any) {
