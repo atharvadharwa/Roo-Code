@@ -1,180 +1,52 @@
-import * as vscode from "vscode"
-import https from "https"
-import http from "http"
-import fs from "fs"
-import type { ApiHandlerOptions } from "../../shared/api"
-import { getModelParams } from "../transform/model-params"
 import { deepSeekModels, deepSeekDefaultModelId } from "@roo-code/types"
 
-// Define the required types locally
-type ApiRequest = any
-type ApiStreamChunk = any
-type ModelInfoWithParams = any
+import type { ApiHandlerOptions } from "../../shared/api"
 
-export class DeepSeekHandler {
-  private options: ApiHandlerOptions
-  private caBundlePath?: string
-  private agent?: https.Agent
-  private outputChannel: vscode.OutputChannel
+import type { ApiStreamUsageChunk } from "../transform/stream"
+import { getModelParams } from "../transform/model-params"
 
-  constructor(options: ApiHandlerOptions) {
-    this.options = options
-    this.caBundlePath = options.deepSeekCaBundlePath
-    this.outputChannel = vscode.window.createOutputChannel("DeepSeek Debug")
+import { OpenAiHandler } from "./openai"
 
-    // Set CA bundle as environment variable
-    if (this.caBundlePath) {
-      try {
-        process.env["REQUESTS_CA_BUNDLE"] = this.caBundlePath
-        const ca = fs.readFileSync(this.caBundlePath)
-        this.agent = new https.Agent({ ca })
-      } catch (error) {
-        this.outputChannel.appendLine(`Error reading CA bundle: ${error}`)
-      }
-    }
-  }
+export class DeepSeekHandler extends OpenAiHandler {
+	constructor(options: ApiHandlerOptions) {
+		super({
+			...options,
+			openAiApiKey: options.deepSeekApiKey ?? "not-provided",
+			openAiModelId: options.apiModelId ?? deepSeekDefaultModelId,
+			openAiBaseUrl: options.deepSeekBaseUrl ?? "https://api.deepseek.com",
+			openAiStreamingEnabled: true,
+			includeMaxTokens: true,
+		})
+	}
 
-  getModel(): ModelInfoWithParams {
-    const id = this.options.apiModelId ?? deepSeekDefaultModelId
-    const info = deepSeekModels[id as keyof typeof deepSeekModels] || deepSeekModels[deepSeekDefaultModelId]
-    const params = getModelParams({ format: "openai", modelId: id, model: info, settings: this.options })
-    return { id, info, ...params }
-  }
+	override getHeaders() {
+		// Log API key for debugging (remove after issue is resolved)
+		if (this.outputChannel) {
+			this.outputChannel.appendLine(`Using DeepSeek API key: ${this.options.openAiApiKey ? '***' + this.options.openAiApiKey.slice(-4) : 'not set'}`)
+		}
+		
+		// DeepSeek requires Bearer token authentication
+		return {
+			...super.getHeaders(),
+			Authorization: `Bearer ${this.options.openAiApiKey}`
+		}
+	}
 
-  async *createMessage(request: ApiRequest): AsyncGenerator<ApiStreamChunk> {
-    const endpoint = this.options.deepSeekBaseUrl ?? "https://api.deepseek.com"
-    const token = this.options.deepSeekApiKey
-    const model = this.getModel().id
+	override getModel() {
+		const id = this.options.apiModelId ?? deepSeekDefaultModelId
+		const info = deepSeekModels[id as keyof typeof deepSeekModels] || deepSeekModels[deepSeekDefaultModelId]
+		const params = getModelParams({ format: "openai", modelId: id, model: info, settings: this.options })
+		return { id, info, ...params }
+	}
 
-    if (!token) {
-      throw new Error("DeepSeek API token is required")
-    }
-
-    // Format headers exactly as in Python sample
-    const headers = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    }
-
-    // Format messages using helper function
-    const messages = this.formatMessages(request);
-
-    // Create payload
-    const data = {
-      model,
-      messages
-    };
-
-    // Parse endpoint URL to determine protocol
-    const url = new URL(endpoint)
-    const httpModule = url.protocol === 'https:' ? https : http
-    
-    const response = await new Promise<http.IncomingMessage>((resolve, reject) => {
-      const options: https.RequestOptions = {
-        method: 'POST',
-        headers
-      }
-      
-      // Only add agent for HTTPS connections
-      if (url.protocol === 'https:' && this.agent) {
-        options.agent = this.agent
-      }
-
-      const req = httpModule.request(url, options, resolve)
-      req.on('error', reject)
-      req.write(JSON.stringify(data))
-      req.end()
-    })
-
-    // Capture full response
-    let buffer = ''
-    for await (const chunk of response) {
-      buffer += chunk.toString()
-    }
-
-    // Log API response for debugging
-    this.outputChannel.show(true)
-    this.outputChannel.appendLine("--- DeepSeek API Request ---")
-    this.outputChannel.appendLine(`Endpoint: ${endpoint}`)
-    this.outputChannel.appendLine("Headers:")
-    this.outputChannel.appendLine(JSON.stringify(headers, null, 2))
-    this.outputChannel.appendLine("Body:")
-    this.outputChannel.appendLine(JSON.stringify(data, null, 2))
-    
-    this.outputChannel.appendLine("--- DeepSeek API Response ---")
-    this.outputChannel.appendLine(`Status Code: ${response.statusCode}`)
-    this.outputChannel.appendLine("Headers:")
-    this.outputChannel.appendLine(JSON.stringify(response.headers, null, 2))
-    this.outputChannel.appendLine("Body:")
-    this.outputChannel.appendLine(buffer.substring(0, 2000) + (buffer.length > 2000 ? "..." : ""))
-    
-    try {
-      const json = JSON.parse(buffer)
-      this.outputChannel.appendLine("Parsed response:")
-      this.outputChannel.appendLine(JSON.stringify(json, null, 2))
-      
-      // Extract content with robust error handling
-      if (json.choices && json.choices.length > 0) {
-        const choice = json.choices[0]
-        if (choice.message && choice.message.content) {
-          yield {
-            type: 'content',
-            content: choice.message.content
-          }
-          return
-        }
-      }
-      
-      // Handle error responses
-      if (json.error && json.error.message) {
-        throw new Error(`API Error: ${json.error.message}`)
-      }
-      
-      throw new Error("No valid content found in API response")
-    } catch (e) {
-      this.outputChannel.appendLine(`Response parse error: ${e}`)
-      throw new Error(`Failed to parse API response: ${e.message}`)
-    }
-  }
-
-  private formatMessages(request: ApiRequest): any[] {
-    const messages = [];
-    
-    // Handle system message (compatibility with both systemMessage and systemPrompt)
-    const systemMessage = request.systemMessage || request.systemPrompt;
-    if (systemMessage) {
-      messages.push({
-        role: "system",
-        content: systemMessage
-      });
-    }
-
-    // Add user messages, ensuring at least one user message exists
-    if (request.messages && request.messages.length > 0) {
-      for (const message of request.messages) {
-        messages.push({
-          role: message.role || "user",
-          content: message.content
-        });
-      }
-    } else if (request.prompt) {
-      // Fallback to prompt field if no messages array
-      messages.push({
-        role: "user",
-        content: request.prompt
-      });
-    } else {
-      throw new Error("No user messages or prompt provided");
-    }
-    
-    return messages;
-  }
-
-  protected processUsageMetrics(usage: any) {
-    return {
-      type: "usage",
-      inputTokens: usage?.prompt_tokens || 0,
-      outputTokens: usage?.completion_tokens || 0,
-    }
-  }
+	// Override to handle DeepSeek's usage metrics, including caching.
+	protected override processUsageMetrics(usage: any): ApiStreamUsageChunk {
+		return {
+			type: "usage",
+			inputTokens: usage?.prompt_tokens || 0,
+			outputTokens: usage?.completion_tokens || 0,
+			cacheWriteTokens: usage?.prompt_tokens_details?.cache_miss_tokens,
+			cacheReadTokens: usage?.prompt_tokens_details?.cached_tokens,
+		}
+	}
 }

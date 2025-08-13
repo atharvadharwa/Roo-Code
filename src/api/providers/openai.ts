@@ -1,6 +1,10 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI, { AzureOpenAI } from "openai"
 import axios from "axios"
+import fs from "fs"
+import process from "process"
+import https from "https"
+import * as vscode from "vscode"
 
 import {
 	type ModelInfo,
@@ -28,23 +32,63 @@ import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from ".
 // `OpenAINativeHandler` can subclass from this, since it's obviously
 // compatible with the OpenAI API. We can also rename it to `OpenAIHandler`.
 export class OpenAiHandler extends BaseProvider implements SingleCompletionHandler {
-	protected options: ApiHandlerOptions
-	private client: OpenAI
 
-	constructor(options: ApiHandlerOptions) {
-		super()
-		this.options = options
+  protected options: ApiHandlerOptions;
+  private client: OpenAI;
+  protected outputChannel: vscode.OutputChannel
 
-		const baseURL = this.options.openAiBaseUrl ?? "https://api.openai.com/v1"
-		const apiKey = this.options.openAiApiKey ?? "not-provided"
-		const isAzureAiInference = this._isAzureAiInference(this.options.openAiBaseUrl)
-		const urlHost = this._getUrlHost(this.options.openAiBaseUrl)
-		const isAzureOpenAi = urlHost === "azure.com" || urlHost.endsWith(".azure.com") || options.openAiUseAzure
+  logDebug(message: string) {
+    if (this.outputChannel) {
+      this.outputChannel.appendLine(message);
+    }
+  }
 
-		const headers = {
-			...DEFAULT_HEADERS,
-			...(this.options.openAiHeaders || {}),
-		}
+  logDebugMessage(message: string) {
+    if (this.outputChannel) {
+      this.outputChannel.appendLine(message);
+    }
+  }
+
+  constructor(options: ApiHandlerOptions) {
+ super();
+ this.options = options;
+
+ // Initialize headers
+ let headers = {
+   ...DEFAULT_HEADERS,
+   ...(options.openAiHeaders || {}),
+ };
+ this.outputChannel = vscode.window.createOutputChannel("DeepSeek Debug")
+
+ // Set base URL and API key
+ let baseURL = options.openAiBaseUrl ?? "https://api.openai.com/v1";
+ let apiKey = options.openAiApiKey ?? "not-provided";
+
+ // Handle DeepSeek-specific settings
+ let httpsAgent: https.Agent | undefined = undefined;
+ if (options.deepSeekBaseUrl || options.deepSeekApiKey || options.deepSeekCaBundlePath) {
+	 baseURL = options.deepSeekBaseUrl ?? "https://api.deepseek.com";
+	 apiKey = options.deepSeekApiKey ?? "not-provided";
+	 // Set CA bundle for requests (Node.js way)
+	 if (options.deepSeekCaBundlePath) {
+		 try {
+			 this.outputChannel.appendLine(`[Debug] Provided DeepSeek CA bundle path: ${options.deepSeekCaBundlePath}`);
+			 if (fs.existsSync(options.deepSeekCaBundlePath)) {
+				 httpsAgent = new https.Agent({ ca: fs.readFileSync(options.deepSeekCaBundlePath) });
+				 this.outputChannel.appendLine(`[Debug] Using CA bundle for HTTPS requests: ${options.deepSeekCaBundlePath}`);
+			 } else {
+				 this.outputChannel.appendLine(`[Debug] CA bundle path does not exist: ${options.deepSeekCaBundlePath}`);
+			 }
+		 } catch (err) {
+			 console.error("Error setting DeepSeek CA bundle:", err);
+			 this.outputChannel.appendLine(`Error reading CA bundle: ${err}`)
+		 }
+	 }
+ }
+
+	const isAzureAiInference = this._isAzureAiInference(baseURL);
+	const urlHost = this._getUrlHost(baseURL);
+	const isAzureOpenAi = urlHost === "azure.com" || urlHost.endsWith(".azure.com") || options.openAiUseAzure;
 
 		if (isAzureAiInference) {
 			// Azure AI Inference Service (e.g., for DeepSeek) uses a different path structure
@@ -52,25 +96,28 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 				baseURL,
 				apiKey,
 				defaultHeaders: headers,
-				defaultQuery: { "api-version": this.options.azureApiVersion || "2024-05-01-preview" },
-			})
+				defaultQuery: { "api-version": options.azureApiVersion || "2024-05-01-preview" },
+				...(httpsAgent ? { httpAgent: httpsAgent, httpsAgent } : {}),
+			});
 		} else if (isAzureOpenAi) {
 			// Azure API shape slightly differs from the core API shape:
 			// https://github.com/openai/openai-node?tab=readme-ov-file#microsoft-azure-openai
 			this.client = new AzureOpenAI({
 				baseURL,
 				apiKey,
-				apiVersion: this.options.azureApiVersion || azureOpenAiDefaultApiVersion,
+				apiVersion: options.azureApiVersion || azureOpenAiDefaultApiVersion,
 				defaultHeaders: headers,
-			})
+				...(httpsAgent ? { httpAgent: httpsAgent, httpsAgent } : {}),
+			});
 		} else {
 			this.client = new OpenAI({
 				baseURL,
 				apiKey,
 				defaultHeaders: headers,
-			})
+				...(httpsAgent ? { httpAgent: httpsAgent, httpsAgent } : {}),
+			});
 		}
-	}
+  }
 
 	override async *createMessage(
 		systemPrompt: string,
@@ -83,9 +130,27 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 		const enabledR1Format = this.options.openAiR1FormatEnabled ?? false
 		const enabledLegacyFormat = this.options.openAiLegacyFormat ?? false
 		const isAzureAiInference = this._isAzureAiInference(modelUrl)
-		const deepseekReasoner = modelId.includes("deepseek-reasoner") || enabledR1Format
+		const deepseekReasoner = modelId.includes("deepseek-reasoner") ?? true
 		const ark = modelUrl.includes(".volces.com")
 
+		// Log request details
+		this.outputChannel.appendLine('[OpenAI] Request:')
+		this.outputChannel.appendLine('URL: ' + modelUrl)
+		this.outputChannel.appendLine('Model: ' + modelId)
+		// Log the real headers used in the request
+		let realHeaders = {
+		  ...DEFAULT_HEADERS,
+		  ...(this.options.openAiHeaders || {}),
+		};
+		if (this.options.deepSeekBaseUrl || this.options.deepSeekApiKey || this.options.deepSeekCaBundlePath) {
+		  realHeaders = {
+		    ...realHeaders,
+		    "Content-Type": "application/json",
+		    "Authorization": `Bearer ${this.options.deepSeekApiKey ?? "not-provided"}`,
+		  };
+		}
+		this.outputChannel.appendLine('Headers: ' + JSON.stringify(realHeaders))
+		this.outputChannel.appendLine('Payload: ' + JSON.stringify({ systemPrompt, messages, metadata }))
 		if (modelId.includes("o1") || modelId.includes("o3") || modelId.includes("o4")) {
 			yield* this.handleO3FamilyMessage(modelId, systemPrompt, messages)
 			return
@@ -166,6 +231,8 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 				isAzureAiInference ? { path: OPENAI_AZURE_AI_INFERENCE_PATH } : {},
 			)
 
+			// Log response stream start
+			this.outputChannel.appendLine("[OpenAI] Response stream started.")
 			const matcher = new XmlMatcher(
 				"think",
 				(chunk) =>
@@ -176,10 +243,14 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 			)
 
 			let lastUsage
+			let allChunks: any[] = []
 
 			for await (const chunk of stream) {
+				allChunks.push(chunk)
 				const delta = chunk.choices[0]?.delta ?? {}
 
+				// Log each response chunk
+				this.outputChannel.appendLine("[OpenAI] Response chunk: " + JSON.stringify(chunk))
 				if (delta.content) {
 					for (const chunk of matcher.update(delta.content)) {
 						yield chunk
@@ -196,6 +267,9 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 					lastUsage = chunk.usage
 				}
 			}
+
+			// Print the full response stream as JSON
+			this.outputChannel.appendLine("[OpenAI] Full API response (stream): " + JSON.stringify(allChunks))
 
 			for (const chunk of matcher.final()) {
 				yield chunk
@@ -228,6 +302,8 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 				this._isAzureAiInference(modelUrl) ? { path: OPENAI_AZURE_AI_INFERENCE_PATH } : {},
 			)
 
+			// Log response body
+			this.outputChannel.appendLine("[OpenAI] Full API response (non-stream): " + JSON.stringify(response))
 			yield {
 				type: "text",
 				text: response.choices[0]?.message.content || "",
@@ -247,11 +323,22 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 		}
 	}
 
+	getHeaders() {
+return {
+	 ...DEFAULT_HEADERS,
+	 ...(this.options.openAiHeaders || {}),
+};
+	}
+
 	override getModel() {
-		const id = this.options.openAiModelId ?? ""
-		const info = this.options.openAiCustomModelInfo ?? openAiModelInfoSaneDefaults
-		const params = getModelParams({ format: "openai", modelId: id, model: info, settings: this.options })
-		return { id, info, ...params }
+// If DeepSeek integration is selected, default to deepseek-reasoner
+let id = this.options.openAiModelId ?? "";
+if (this.options.deepSeekBaseUrl || this.options.deepSeekApiKey || this.options.deepSeekCaBundlePath) {
+	 id = this.options.apiModelId ?? "deepseek-reasoner";
+}
+const info = this.options.openAiCustomModelInfo ?? openAiModelInfoSaneDefaults;
+const params = getModelParams({ format: "openai", modelId: id, model: info, settings: this.options });
+return { id, info, ...params };
 	}
 
 	async completePrompt(prompt: string): Promise<string> {
@@ -260,6 +347,12 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 			const model = this.getModel()
 			const modelInfo = model.info
 
+			// Log request details
+			this.outputChannel.appendLine('[OpenAI] completePrompt Request:')
+			this.outputChannel.appendLine('URL: ' + this.options.openAiBaseUrl)
+			this.outputChannel.appendLine('Model: ' + model.id)
+			this.outputChannel.appendLine('Headers: ' + JSON.stringify(this.options.openAiHeaders || {}))
+			this.outputChannel.appendLine('Payload: ' + JSON.stringify({ prompt }))
 			const requestOptions: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 				model: model.id,
 				messages: [{ role: "user", content: prompt }],
@@ -273,6 +366,8 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 				isAzureAiInference ? { path: OPENAI_AZURE_AI_INFERENCE_PATH } : {},
 			)
 
+			// Log response body
+			this.outputChannel.appendLine("[OpenAI] completePrompt Response: " + JSON.stringify(response))
 			return response.choices[0]?.message.content || ""
 		} catch (error) {
 			if (error instanceof Error) {
@@ -291,6 +386,12 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 		const modelInfo = this.getModel().info
 		const methodIsAzureAiInference = this._isAzureAiInference(this.options.openAiBaseUrl)
 
+		// Log request details
+		this.outputChannel.appendLine('[OpenAI] O3Family Request:')
+		this.outputChannel.appendLine('URL: ' + this.options.openAiBaseUrl)
+		this.outputChannel.appendLine('Model: ' + modelId)
+		this.outputChannel.appendLine('Headers: ' + JSON.stringify(this.options.openAiHeaders || {}))
+		this.outputChannel.appendLine('Payload: ' + JSON.stringify({ systemPrompt, messages }))
 		if (this.options.openAiStreamingEnabled ?? true) {
 			const isGrokXAI = this._isGrokXAI(this.options.openAiBaseUrl)
 
@@ -319,6 +420,8 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 				methodIsAzureAiInference ? { path: OPENAI_AZURE_AI_INFERENCE_PATH } : {},
 			)
 
+			// Log response stream start
+			this.outputChannel.appendLine("[OpenAI] O3Family Response stream started.")
 			yield* this.handleStreamResponse(stream)
 		} else {
 			const requestOptions: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
@@ -344,6 +447,8 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 				methodIsAzureAiInference ? { path: OPENAI_AZURE_AI_INFERENCE_PATH } : {},
 			)
 
+			// Log response body
+			this.outputChannel.appendLine("[OpenAI] O3Family Response: " + JSON.stringify(response))
 			yield {
 				type: "text",
 				text: response.choices[0]?.message.content || "",
@@ -410,7 +515,7 @@ export class OpenAiHandler extends BaseProvider implements SingleCompletionHandl
 	}
 }
 
-export async function getOpenAiModels(baseUrl?: string, apiKey?: string, openAiHeaders?: Record<string, string>) {
+export async function getOpenAiModels(baseUrl?: string, apiKey?: string, openAiHeaders?: Record<string, string>, deepSeekCaBundlePath?: string) {
 	try {
 		if (!baseUrl) {
 			return []
@@ -437,8 +542,20 @@ export async function getOpenAiModels(baseUrl?: string, apiKey?: string, openAiH
 			config["headers"] = headers
 		}
 
+		// If a CA bundle is provided, use it for axios requests
+		if (deepSeekCaBundlePath && fs.existsSync(deepSeekCaBundlePath)) {
+			config["httpsAgent"] = new https.Agent({ ca: fs.readFileSync(deepSeekCaBundlePath) });
+		}
+
+		// Log request details
+		const outputChannel = vscode.window.createOutputChannel("DeepSeek Debug")
+		outputChannel.appendLine("[OpenAI] getOpenAiModels Request:")
+		outputChannel.appendLine(`URL: ${trimmedBaseUrl}/models`)
+		outputChannel.appendLine('Headers: ' + JSON.stringify(headers))
 		const response = await axios.get(`${trimmedBaseUrl}/models`, config)
 		const modelsArray = response.data?.data?.map((model: any) => model.id) || []
+		// Log response body
+		outputChannel.appendLine("[OpenAI] getOpenAiModels Response: " + JSON.stringify(response.data))
 		return [...new Set<string>(modelsArray)]
 	} catch (error) {
 		return []
