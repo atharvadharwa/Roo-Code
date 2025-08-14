@@ -6,5 +6,4 @@ export const DEFAULT_HEADERS = {
 	"Accept": "*/*",
 	"Accept-Encoding": "gzip, deflate",
 	"Content-Type": "application/json",
-	"Authorization": "", // This will be set dynamically
 }
