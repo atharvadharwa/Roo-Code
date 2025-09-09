@@ -84,7 +84,7 @@
           <field name="roleDefinition">
             <description>Detailed description of the mode's role and expertise</description>
             <best_practice>
-              Start with "You are Roo Code, a [specialist type]..."
+              Start with "You are Autopilot Code, a [specialist type]..."
               List specific areas of expertise
               Mention key technologies or methodologies
             </best_practice>

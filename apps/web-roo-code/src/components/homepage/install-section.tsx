@@ -47,10 +47,10 @@ export function InstallSection({ downloads }: InstallSectionProps) {
 						<div className="relative text-center">
 							{/* Updated h2 to match other sections */}
 							<h2 className="bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
-								Install Roo Code — Open & Flexible
+								Install Autopilot — Open & Flexible
 							</h2>
 							<p className="mt-6 text-lg text-muted-foreground">
-								Roo Code is open-source, model-agnostic, and developer-focused. Install from the VS Code
+								Autopilot is open-source, model-agnostic, and developer-focused. Install from the VS Code
 								Marketplace or the CLI in minutes, then bring your own AI model.
 							</p>
 

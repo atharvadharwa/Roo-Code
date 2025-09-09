@@ -13,7 +13,7 @@ export function RooCloudCTA() {
 					<span>{t("rooCloudCTA.description")}</span>
 				</p>
 				<p>
-					<a href="https://roocode.com/cloud-waitlist">{t("rooCloudCTA.joinWaitlist")}</a>
+					<a href="">{t("Learn More")}</a>
 				</p>
 			</div>
 		</div>

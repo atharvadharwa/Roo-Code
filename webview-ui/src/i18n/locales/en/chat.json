@@ -168,46 +168,46 @@
 		"tokens": "tokens"
 	},
 	"instructions": {
-		"wantsToFetch": "Roo wants to fetch detailed instructions to assist with the current task"
+		"wantsToFetch": "Autopilot wants to fetch detailed instructions to assist with the current task"
 	},
 	"fileOperations": {
-		"wantsToRead": "Roo wants to read this file:",
-		"wantsToReadMultiple": "Roo wants to read multiple files:",
-		"wantsToReadAndXMore": "Roo wants to read this file and {{count}} more:",
-		"wantsToReadOutsideWorkspace": "Roo wants to read this file outside of the workspace:",
+		"wantsToRead": "Autopilot wants to read this file:",
+		"wantsToReadMultiple": "Autopilot wants to read multiple files:",
+		"wantsToReadAndXMore": "Autopilot wants to read this file and {{count}} more:",
+		"wantsToReadOutsideWorkspace": "Autopilot wants to read this file outside of the workspace:",
 		"didRead": "Roo read this file:",
-		"wantsToEdit": "Roo wants to edit this file:",
-		"wantsToEditOutsideWorkspace": "Roo wants to edit this file outside of the workspace:",
-		"wantsToEditProtected": "Roo wants to edit a protected configuration file:",
-		"wantsToApplyBatchChanges": "Roo wants to apply changes to multiple files:",
-		"wantsToCreate": "Roo wants to create a new file:",
-		"wantsToSearchReplace": "Roo wants to search and replace in this file:",
+		"wantsToEdit": "Autopilot wants to edit this file:",
+		"wantsToEditOutsideWorkspace": "Autopilot wants to edit this file outside of the workspace:",
+		"wantsToEditProtected": "Autopilot wants to edit a protected configuration file:",
+		"wantsToApplyBatchChanges": "Autopilot wants to apply changes to multiple files:",
+		"wantsToCreate": "Autopilot wants to create a new file:",
+		"wantsToSearchReplace": "Autopilot wants to search and replace in this file:",
 		"didSearchReplace": "Roo performed search and replace on this file:",
-		"wantsToInsert": "Roo wants to insert content into this file:",
-		"wantsToInsertWithLineNumber": "Roo wants to insert content into this file at line {{lineNumber}}:",
-		"wantsToInsertAtEnd": "Roo wants to append content to the end of this file:"
+		"wantsToInsert": "Autopilot wants to insert content into this file:",
+		"wantsToInsertWithLineNumber": "Autopilot wants to insert content into this file at line {{lineNumber}}:",
+		"wantsToInsertAtEnd": "Autopilot wants to append content to the end of this file:"
 	},
 	"directoryOperations": {
-		"wantsToViewTopLevel": "Roo wants to view the top level files in this directory:",
+		"wantsToViewTopLevel": "Autopilot wants to view the top level files in this directory:",
 		"didViewTopLevel": "Roo viewed the top level files in this directory:",
-		"wantsToViewTopLevelOutsideWorkspace": "Roo wants to view the top level files in this directory (outside workspace):",
+		"wantsToViewTopLevelOutsideWorkspace": "Autopilot wants to view the top level files in this directory (outside workspace):",
 		"didViewTopLevelOutsideWorkspace": "Roo viewed the top level files in this directory (outside workspace):",
-		"wantsToViewRecursive": "Roo wants to recursively view all files in this directory:",
+		"wantsToViewRecursive": "Autopilot wants to recursively view all files in this directory:",
 		"didViewRecursive": "Roo recursively viewed all files in this directory:",
-		"wantsToViewRecursiveOutsideWorkspace": "Roo wants to recursively view all files in this directory (outside workspace):",
+		"wantsToViewRecursiveOutsideWorkspace": "Autopilot wants to recursively view all files in this directory (outside workspace):",
 		"didViewRecursiveOutsideWorkspace": "Roo recursively viewed all files in this directory (outside workspace):",
-		"wantsToViewDefinitions": "Roo wants to view source code definition names used in this directory:",
+		"wantsToViewDefinitions": "Autopilot wants to view source code definition names used in this directory:",
 		"didViewDefinitions": "Roo viewed source code definition names used in this directory:",
-		"wantsToViewDefinitionsOutsideWorkspace": "Roo wants to view source code definition names used in this directory (outside workspace):",
+		"wantsToViewDefinitionsOutsideWorkspace": "Autopilot wants to view source code definition names used in this directory (outside workspace):",
 		"didViewDefinitionsOutsideWorkspace": "Roo viewed source code definition names used in this directory (outside workspace):",
-		"wantsToSearch": "Roo wants to search this directory for <code>{{regex}}</code>:",
+		"wantsToSearch": "Autopilot wants to search this directory for <code>{{regex}}</code>:",
 		"didSearch": "Roo searched this directory for <code>{{regex}}</code>:",
-		"wantsToSearchOutsideWorkspace": "Roo wants to search this directory (outside workspace) for <code>{{regex}}</code>:",
+		"wantsToSearchOutsideWorkspace": "Autopilot wants to search this directory (outside workspace) for <code>{{regex}}</code>:",
 		"didSearchOutsideWorkspace": "Roo searched this directory (outside workspace) for <code>{{regex}}</code>:"
 	},
 	"codebaseSearch": {
-		"wantsToSearch": "Roo wants to search the codebase for <code>{{query}}</code>:",
-		"wantsToSearchWithPath": "Roo wants to search the codebase for <code>{{query}}</code> in <code>{{path}}</code>:",
+		"wantsToSearch": "Autopilot wants to search the codebase for <code>{{query}}</code>:",
+		"wantsToSearchWithPath": "Autopilot wants to search the codebase for <code>{{query}}</code> in <code>{{path}}</code>:",
 		"didSearch_one": "Found 1 result",
 		"didSearch_other": "Found {{count}} results",
 		"resultTooltip": "Similarity score: {{score}} (click to open file)"
@@ -232,18 +232,18 @@
 	"response": "Response",
 	"arguments": "Arguments",
 	"mcp": {
-		"wantsToUseTool": "Roo wants to use a tool on the {{serverName}} MCP server:",
-		"wantsToAccessResource": "Roo wants to access a resource on the {{serverName}} MCP server:"
+		"wantsToUseTool": "Autopilot wants to use a tool on the {{serverName}} MCP server:",
+		"wantsToAccessResource": "Autopilot wants to access a resource on the {{serverName}} MCP server:"
 	},
 	"modes": {
-		"wantsToSwitch": "Roo wants to switch to {{mode}} mode",
-		"wantsToSwitchWithReason": "Roo wants to switch to {{mode}} mode because: {{reason}}",
+		"wantsToSwitch": "Autopilot wants to switch to {{mode}} mode",
+		"wantsToSwitchWithReason": "Autopilot wants to switch to {{mode}} mode because: {{reason}}",
 		"didSwitch": "Roo switched to {{mode}} mode",
 		"didSwitchWithReason": "Roo switched to {{mode}} mode because: {{reason}}"
 	},
 	"subtasks": {
-		"wantsToCreate": "Roo wants to create a new subtask in {{mode}} mode:",
-		"wantsToFinish": "Roo wants to finish this subtask",
+		"wantsToCreate": "Autopilot wants to create a new subtask in {{mode}} mode:",
+		"wantsToFinish": "Autopilot wants to finish this subtask",
 		"newTaskContent": "Subtask Instructions",
 		"completionContent": "Subtask Completed",
 		"resultContent": "Subtask Results",
@@ -290,7 +290,7 @@
 		"countdownDisplay": "{{count}}s"
 	},
 	"browser": {
-		"rooWantsToUse": "Roo wants to use the browser:",
+		"rooWantsToUse": "Autopilot wants to use the browser:",
 		"consoleLogs": "Console Logs",
 		"noNewLogs": "(No new logs)",
 		"screenshot": "Browser screenshot",
@@ -350,9 +350,8 @@
 		"ariaLabel": "Version {{version}} - Click to view release notes"
 	},
 	"rooCloudCTA": {
-		"title": "Roo Code Cloud is coming soon!",
-		"description": "Run Roomote agents in the cloud, access your tasks from anywhere, collaborate with others, and more.",
-		"joinWaitlist": "Join the waitlist to get early access."
+		"title": "Welcome to Autopilot!",
+		"description": "Explore Real Agentic Coding that allows you to create full projects with single prompt."
 	},
 	"command": {
 		"triggerDescription": "Trigger the {{name}} command"
